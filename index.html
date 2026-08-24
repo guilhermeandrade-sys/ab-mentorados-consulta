@@ -169,6 +169,10 @@
   .sub-bloco + .sub-bloco{margin-top:10px;}
   .sub-bloco-titulo{font-size:12px; font-weight:700; color:var(--accent-2); margin-bottom:6px; display:flex; align-items:center; gap:6px;}
 
+  .rev-campo{margin-top:10px;}
+  .rev-campo:first-child{margin-top:0;}
+  .rev-campo-nome{font-size:13.5px; font-weight:600;}
+
   .modal-tabs{display:flex; gap:4px; margin-bottom:20px; border-bottom:1px solid var(--border);}
   .modal-tab-btn{
     padding:8px 12px; border:none; background:none; cursor:pointer; font-size:13.5px; color:var(--text-2);
@@ -634,16 +638,39 @@ $("#modal-overlay").addEventListener("click", e => { if(e.target.id === "modal-o
 $("#modal-close").addEventListener("click", fecharModal);
 document.addEventListener("keydown", e => { if(e.key === "Escape") fecharModal(); });
 
+// pra cada revisão mostra o comentário por campo (quando existe) — antes só aparecia
+// a lista crua de nomes de campo, e o comentário de verdade ficava escondido.
+function renderCamposRevisao(fieldFeedback, camposFallback){
+  if(fieldFeedback){
+    const linhas = Object.entries(fieldFeedback)
+      .filter(([, v]) => v) // pula campo não tocado nesta rodada de revisão
+      .map(([k, v]) => `
+        <div class="rev-campo">
+          <span class="rev-campo-nome">${esc(humanizarChave(k))}</span>
+          ${v.status ? (BADGE_FEEDBACK[v.status] || "") : ""}
+          ${v.comment ? `<div class="feedback-box">${esc(v.comment)}</div>` : ""}
+        </div>
+      `);
+    if(linhas.length) return linhas.join("");
+  }
+  if(camposFallback && camposFallback.length){
+    return `<div class="card-body">Campos: ${camposFallback.map(k => esc(humanizarChave(k))).join(", ")}</div>`;
+  }
+  return "";
+}
+
 function renderRevisoes(rev){
   const el = $("#tab-revisoes");
   const todas = [
     ...rev.atual.map(r => ({
       quando: r.occurred_at, tipo: r.event_type, feedback: r.mentor_feedback,
-      quem: r.actor_email, campos: r.fields_to_correct, versao: 'v2 · rodada ' + r.round_no
+      quem: r.actor_email, campos: r.fields_to_correct, fieldFeedback: r.field_feedback,
+      versao: 'v2 · rodada ' + r.round_no
     })),
     ...rev.legado.map(r => ({
       quando: r.created_at, tipo: r.event_type, feedback: null,
-      quem: r.mentor_email, campos: r.fields_to_correct, versao: 'v1'
+      quem: r.mentor_email, campos: r.fields_to_correct, fieldFeedback: null,
+      versao: 'v1'
     })),
   ].sort((a,b) => (b.quando||"").localeCompare(a.quando||""));
 
@@ -657,7 +684,7 @@ function renderRevisoes(rev){
         <span class="chip chip-neutral">${esc(r.versao)}</span>
       </div>
       <div class="card-meta">${fmtData(r.quando)}${r.quem ? ' · ' + esc(r.quem) : ''}</div>
-      ${r.campos && r.campos.length ? `<div class="card-body">Campos: ${r.campos.map(esc).join(", ")}</div>` : ''}
+      ${renderCamposRevisao(r.fieldFeedback, r.campos)}
       ${r.feedback ? `<div class="feedback-box">${esc(r.feedback)}</div>` : ''}
     </div>
   `).join("");
