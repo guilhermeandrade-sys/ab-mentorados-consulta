@@ -136,7 +136,41 @@
 
   .empty-tab{color:var(--text-3); font-size:14px; padding:20px 0;}
 
+  .card-clickable{cursor:pointer; transition:border-color .12s;}
+  .card-clickable:hover{border-color:var(--accent);}
+  .card-hint{font-size:12px; color:var(--accent-2); margin-top:8px;}
+
+  /* ---------- modal (conteúdo da ferramenta) ---------- */
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(33,29,20,.45); z-index:60;
+    display:none; align-items:flex-start; justify-content:center; padding:40px 20px; overflow-y:auto;
+  }
+  .modal-overlay.show{display:flex;}
+  .modal{
+    background:var(--surface); border-radius:14px; max-width:720px; width:100%;
+    padding:28px 30px 34px; box-shadow:var(--shadow); position:relative;
+  }
+  .modal-close{
+    position:absolute; top:16px; right:18px; border:none; background:none; font-size:22px;
+    color:var(--text-3); cursor:pointer; line-height:1; padding:4px 8px; border-radius:6px;
+  }
+  .modal-close:hover{background:var(--surface-2); color:var(--text);}
+  #modal-title{font-size:19px; font-weight:700; margin:0 0 4px; padding-right:30px;}
+  #modal-sub{font-size:13px; color:var(--text-3); font-family:"IBM Plex Mono",monospace; margin-bottom:20px;}
+
+  .campo{margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid var(--border-soft);}
+  .campo:last-child{border-bottom:none; margin-bottom:0; padding-bottom:0;}
+  .campo-label{font-size:12.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--text-2); margin-bottom:5px;}
+  .campo-valor{font-size:14.5px; white-space:pre-wrap; overflow-wrap:break-word;}
+  .sub-bloco{
+    background:var(--surface-2); border:1px solid var(--border-soft); border-radius:8px;
+    padding:12px 14px; margin-top:6px;
+  }
+  .sub-bloco + .sub-bloco{margin-top:10px;}
+  .sub-bloco-titulo{font-size:12px; font-weight:700; color:var(--accent-2); margin-bottom:6px;}
+
   @media (max-width:640px){
+    .modal{padding:22px 18px 26px;}
     header.top{padding:16px 18px;}
     .page{padding:18px 18px 60px;}
     .file-row{flex-wrap:wrap;}
@@ -191,6 +225,15 @@
     <div class="tab-panel" id="tab-formularios"></div>
     <div class="tab-panel" id="tab-revisoes"></div>
     <div class="tab-panel" id="tab-arquivos"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <button class="modal-close" id="modal-close" aria-label="Fechar">×</button>
+    <h2 id="modal-title"></h2>
+    <div id="modal-sub"></div>
+    <div id="modal-body"></div>
   </div>
 </div>
 
@@ -362,11 +405,14 @@ function renderProgresso(rows){
   `).join("");
 }
 
+let FORM_ROWS = [];
+
 function renderFormularios(rows){
+  FORM_ROWS = rows;
   const el = $("#tab-formularios");
   if(!rows.length){ el.innerHTML = '<div class="empty-tab">Sem respostas de ferramenta.</div>'; return; }
-  el.innerHTML = rows.map(r => `
-    <div class="card">
+  el.innerHTML = rows.map((r, i) => `
+    <div class="card card-clickable" data-idx="${i}">
       <div class="card-head">
         <div class="card-title">${esc(r.form_type)} ${r.is_current ? '' : '<span class="chip chip-neutral">versão antiga</span>'}</div>
         <span class="chip ${r.status === 'submitted' ? 'chip-ok' : 'chip-neutral'}">${esc(r.status)} · v${esc(r.version)}</span>
@@ -376,9 +422,88 @@ function renderFormularios(rows){
         ${r.submitted_at ? ' · enviado em ' + fmtData(r.submitted_at) : ''}
       </div>
       ${r.mentor_feedback ? `<div class="feedback-box"><b>Parecer do mentor:</b><br>${esc(r.mentor_feedback)}</div>` : ''}
+      <div class="card-hint">clique pra ver o conteúdo preenchido →</div>
     </div>
   `).join("");
+
+  $$(".card-clickable", el).forEach(card => {
+    card.addEventListener("click", () => abrirModalFormulario(FORM_ROWS[Number(card.dataset.idx)]));
+  });
 }
+
+// ---------------- conteúdo da ferramenta (modal) ----------------
+
+// "cidade_estado" -> "Cidade estado" · ignora chaves internas tipo "__schema_version"
+function humanizarChave(k){
+  const limpa = k.replace(/^__+/, "");
+  const palavras = limpa.replace(/_/g, " ");
+  return palavras.charAt(0).toUpperCase() + palavras.slice(1);
+}
+
+function vazio(v){
+  if(v === null || v === undefined) return true;
+  if(typeof v === "string") return v.trim() === "";
+  if(Array.isArray(v)) return v.length === 0;
+  if(typeof v === "object") return Object.keys(v).length === 0;
+  return false;
+}
+
+const BADGE_FEEDBACK = {
+  ok: '<span class="chip chip-ok" style="margin-left:6px;">ok</span>',
+  corrigir: '<span class="chip chip-flag" style="margin-left:6px;">corrigir</span>',
+};
+
+// devolve o HTML de UM valor (string, número, lista simples, lista de blocos ou objeto aninhado)
+function renderValorCampo(v, nivel){
+  if(typeof v === "string" || typeof v === "number" || typeof v === "boolean"){
+    return `<div class="campo-valor">${esc(String(v)).replace(/\n/g, "<br>")}</div>`;
+  }
+  if(Array.isArray(v)){
+    const objetos = v.every(x => x && typeof x === "object" && !Array.isArray(x));
+    if(objetos){
+      return v.map((item, i) => `
+        <div class="sub-bloco">
+          <div class="sub-bloco-titulo">Item ${i + 1}</div>
+          ${renderCampos(item, {}, nivel + 1)}
+        </div>
+      `).join("");
+    }
+    return `<div class="campo-valor">${v.map(x => esc(String(x))).join(", ")}</div>`;
+  }
+  if(typeof v === "object"){
+    return `<div class="sub-bloco">${renderCampos(v, {}, nivel + 1)}</div>`;
+  }
+  return "";
+}
+
+// renderiza um objeto {chave: valor} pulando chaves internas e valores vazios
+function renderCampos(obj, feedbackMap, nivel = 0){
+  const chaves = Object.keys(obj || {}).filter(k => !k.startsWith("__"));
+  const partes = chaves.map(k => {
+    if(vazio(obj[k])) return "";
+    const fb = feedbackMap && feedbackMap[k];
+    return `
+      <div class="campo">
+        <div class="campo-label">${esc(humanizarChave(k))}${fb && fb.status ? (BADGE_FEEDBACK[fb.status] || "") : ""}</div>
+        ${renderValorCampo(obj[k], nivel)}
+        ${fb && fb.comment ? `<div class="feedback-box">${esc(fb.comment)}</div>` : ""}
+      </div>
+    `;
+  }).filter(Boolean);
+  if(!partes.length) return '<div class="empty-tab">Sem conteúdo preenchido nesta ferramenta.</div>';
+  return partes.join("");
+}
+
+function abrirModalFormulario(r){
+  $("#modal-title").textContent = r.form_type;
+  $("#modal-sub").textContent = `${r.status} · v${r.version} · atualizado em ${fmtData(r.updated_at)}`;
+  $("#modal-body").innerHTML = renderCampos(r.responses || {}, r.field_feedback || {});
+  $("#modal-overlay").classList.add("show");
+}
+function fecharModal(){ $("#modal-overlay").classList.remove("show"); }
+$("#modal-overlay").addEventListener("click", e => { if(e.target.id === "modal-overlay") fecharModal(); });
+$("#modal-close").addEventListener("click", fecharModal);
+document.addEventListener("keydown", e => { if(e.key === "Escape") fecharModal(); });
 
 function renderRevisoes(rev){
   const el = $("#tab-revisoes");
