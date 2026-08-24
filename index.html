@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Consulta de Mentorados — AB Carreiras</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+  :root{
+    --bg:#F5F2EA; --surface:#FFFFFF; --surface-2:#FBF8F1;
+    --border:#E3DCC9; --border-soft:#ECE6D6;
+    --text:#211D14; --text-2:#6E6650; --text-3:#9C9377;
+    --accent:#2E4C62; --accent-2:#3E6683; --accent-soft:#DEE7EB;
+    --flag:#A85423; --flag-soft:#F3E1D2; --flag-soft-border:#E4C2A3;
+    --ok:#3C6E4F; --ok-soft:#DEEAE1;
+    --danger:#A03A2E; --danger-soft:#F5DFDA;
+    --mono-chip-bg:#EFE9D8; --mono-chip-text:#4A4530;
+    --shadow:0 1px 2px rgba(33,29,20,.04), 0 6px 20px -8px rgba(33,29,20,.10);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:"Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size:15.5px; line-height:1.5;
+  }
+  code,.mono{font-family:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;}
+
+  /* ---------- gate ---------- */
+  #gate{
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    background:var(--bg); z-index:50; padding:20px;
+  }
+  #gate .box{
+    background:var(--surface); border:1px solid var(--border-soft); border-radius:14px;
+    padding:32px 30px; max-width:380px; width:100%; box-shadow:var(--shadow);
+  }
+  #gate h1{font-size:19px; margin:0 0 6px;}
+  #gate p{color:var(--text-2); font-size:14px; margin:0 0 20px;}
+  #gate input{
+    width:100%; padding:11px 13px; border:1px solid var(--border); border-radius:8px;
+    font-size:15px; font-family:"IBM Plex Mono", monospace; background:var(--surface-2); color:var(--text);
+  }
+  #gate button{
+    margin-top:12px; width:100%; padding:11px; border:none; border-radius:8px;
+    background:var(--accent); color:#fff; font-size:14.5px; font-weight:600; cursor:pointer;
+  }
+  #gate button:hover{background:var(--accent-2)}
+  #gate .err{color:var(--danger); font-size:13.5px; margin-top:10px; display:none;}
+
+  /* ---------- shell ---------- */
+  header.top{
+    padding:22px 28px; border-bottom:1px solid var(--border);
+    display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap;
+  }
+  header.top h1{font-size:19px; margin:0; font-weight:700;}
+  header.top .tag{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--text-3);}
+
+  .page{max-width:980px; margin:0 auto; padding:24px 28px 80px;}
+
+  .picker{position:relative; margin-bottom:28px;}
+  .picker label{display:block; font-size:13px; color:var(--text-2); margin-bottom:6px;}
+  .picker input{
+    width:100%; padding:12px 14px; border:1px solid var(--border); border-radius:10px;
+    font-size:15.5px; background:var(--surface); color:var(--text);
+  }
+  .picker .results{
+    position:absolute; top:100%; left:0; right:0; margin-top:4px;
+    background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    box-shadow:var(--shadow); max-height:320px; overflow-y:auto; z-index:10; display:none;
+  }
+  .picker .results.show{display:block;}
+  .picker .opt{padding:10px 14px; cursor:pointer; border-bottom:1px solid var(--border-soft);}
+  .picker .opt:last-child{border-bottom:none;}
+  .picker .opt:hover, .picker .opt.hi{background:var(--accent-soft);}
+  .picker .opt .n{font-weight:600; font-size:14.5px;}
+  .picker .opt .e{font-size:12.5px; color:var(--text-2);}
+  .picker .empty{padding:14px; color:var(--text-3); font-size:13.5px;}
+
+  #estado-vazio{color:var(--text-3); font-size:14.5px; padding:40px 0; text-align:center;}
+  #estado-carregando{color:var(--text-3); font-size:14.5px; padding:40px 0; text-align:center; display:none;}
+  #estado-erro{color:var(--danger); background:var(--danger-soft); border-radius:10px; padding:14px 16px; display:none; margin-bottom:20px;}
+
+  #resultado{display:none;}
+  .mentee-head{
+    display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap;
+    margin-bottom:22px; padding-bottom:16px; border-bottom:1px solid var(--border);
+  }
+  .mentee-head h2{margin:0 0 3px; font-size:22px;}
+  .mentee-head .sub{color:var(--text-2); font-size:14px;}
+
+  .tabs{display:flex; gap:4px; margin-bottom:20px; border-bottom:1px solid var(--border); flex-wrap:wrap;}
+  .tab-btn{
+    padding:9px 14px; border:none; background:none; cursor:pointer; font-size:14px; color:var(--text-2);
+    border-bottom:2px solid transparent; font-family:inherit; font-weight:500;
+  }
+  .tab-btn.active{color:var(--accent); border-bottom-color:var(--accent); font-weight:700;}
+  .tab-btn .n{font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--text-3); margin-left:3px;}
+
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  .card{
+    background:var(--surface); border:1px solid var(--border-soft); border-radius:12px;
+    padding:16px 18px; margin-bottom:10px; box-shadow:var(--shadow);
+  }
+  .card-head{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:6px;}
+  .card-title{font-weight:600; font-size:15px;}
+  .chip{
+    font-family:"IBM Plex Mono",monospace; font-size:11.5px; padding:2px 8px; border-radius:100px;
+    border:1px solid transparent; white-space:nowrap;
+  }
+  .chip-ok{background:var(--ok-soft); color:var(--ok);}
+  .chip-flag{background:var(--flag-soft); color:var(--flag); border-color:var(--flag-soft-border);}
+  .chip-neutral{background:var(--surface-2); color:var(--text-3); border-color:var(--border);}
+  .card-meta{font-size:12.5px; color:var(--text-3); font-family:"IBM Plex Mono",monospace;}
+  .card-body{font-size:14px; color:var(--text); margin-top:6px;}
+  .card-body b{font-weight:600;}
+  .feedback-box{
+    background:var(--surface-2); border:1px solid var(--border-soft); border-radius:8px;
+    padding:10px 12px; margin-top:8px; font-size:13.5px; white-space:pre-wrap;
+  }
+
+  .file-row{
+    display:flex; align-items:center; gap:12px; padding:12px 14px; border:1px solid var(--border-soft);
+    border-radius:10px; margin-bottom:8px; background:var(--surface);
+  }
+  .file-row .info{flex:1; min-width:0;}
+  .file-row .fname{font-weight:600; font-size:14px; overflow-wrap:break-word;}
+  .file-row .fmeta{font-size:12.5px; color:var(--text-3); margin-top:2px;}
+  .file-row button{
+    flex-shrink:0; padding:8px 14px; border-radius:8px; border:1px solid var(--accent);
+    background:var(--accent); color:#fff; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit;
+  }
+  .file-row button:hover{background:var(--accent-2); border-color:var(--accent-2);}
+  .file-row button:disabled{opacity:.55; cursor:default;}
+
+  .empty-tab{color:var(--text-3); font-size:14px; padding:20px 0;}
+
+  @media (max-width:640px){
+    header.top{padding:16px 18px;}
+    .page{padding:18px 18px 60px;}
+    .file-row{flex-wrap:wrap;}
+    .file-row button{width:100%;}
+  }
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="box">
+    <h1>Consulta de Mentorados</h1>
+    <p>Ferramenta interna AB Carreiras — acesso restrito à equipe. Digite o código de acesso.</p>
+    <input type="password" id="gate-input" placeholder="código de acesso" autocomplete="off">
+    <button id="gate-btn">Entrar</button>
+    <div class="err" id="gate-err">Código incorreto. Confira com quem te passou o acesso.</div>
+  </div>
+</div>
+
+<header class="top">
+  <h1>Consulta de Mentorados</h1>
+  <span class="tag">AB Carreiras · leitura direta do banco do app</span>
+</header>
+
+<div class="page">
+  <div class="picker">
+    <label for="busca">Buscar mentorado (nome ou e-mail)</label>
+    <input type="text" id="busca" placeholder="digite pra buscar..." autocomplete="off">
+    <div class="results" id="busca-results"></div>
+  </div>
+
+  <div id="estado-vazio">Selecione um mentorado acima pra ver progresso, ferramentas, revisões e arquivos.</div>
+  <div id="estado-carregando">Buscando...</div>
+  <div id="estado-erro"></div>
+
+  <div id="resultado">
+    <div class="mentee-head">
+      <div>
+        <h2 id="m-nome"></h2>
+        <div class="sub" id="m-email"></div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="progresso">Progresso <span class="n" id="cnt-progresso"></span></button>
+      <button class="tab-btn" data-tab="formularios">Ferramentas <span class="n" id="cnt-formularios"></span></button>
+      <button class="tab-btn" data-tab="revisoes">Revisões <span class="n" id="cnt-revisoes"></span></button>
+      <button class="tab-btn" data-tab="arquivos">Arquivos <span class="n" id="cnt-arquivos"></span></button>
+    </div>
+
+    <div class="tab-panel active" id="tab-progresso"></div>
+    <div class="tab-panel" id="tab-formularios"></div>
+    <div class="tab-panel" id="tab-revisoes"></div>
+    <div class="tab-panel" id="tab-arquivos"></div>
+  </div>
+</div>
+
+<script>
+const FN_URL = "https://mrrrucblahqqcmzmrtcr.supabase.co/functions/v1/staff-portal";
+const LS_KEY = "mentorados_portal_access_key";
+
+const $ = (s, el=document) => el.querySelector(s);
+const $$ = (s, el=document) => Array.from(el.querySelectorAll(s));
+
+function fmtData(iso){
+  if(!iso) return "—";
+  const d = new Date(iso);
+  if(isNaN(d)) return "—";
+  return d.toLocaleDateString("pt-BR", {day:"2-digit", month:"2-digit", year:"numeric"}) + " " +
+         d.toLocaleTimeString("pt-BR", {hour:"2-digit", minute:"2-digit"});
+}
+function fmtBytes(n){
+  if(n == null) return "";
+  if(n < 1024) return n + " B";
+  if(n < 1024*1024) return (n/1024).toFixed(0) + " KB";
+  return (n/1024/1024).toFixed(1) + " MB";
+}
+function esc(s){
+  return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+async function api(action, params={}){
+  const key = localStorage.getItem(LS_KEY);
+  const res = await fetch(FN_URL, {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({action, accessKey:key, ...params})
+  });
+  const data = await res.json();
+  if(!res.ok) throw new Error(data.error || ("erro " + res.status));
+  return data;
+}
+
+// ---------------- gate ----------------
+async function tentarEntrar(key){
+  localStorage.setItem(LS_KEY, key);
+  try{
+    await api("list_mentees");
+    $("#gate").style.display = "none";
+    carregarMentorados();
+  }catch(e){
+    localStorage.removeItem(LS_KEY);
+    $("#gate-err").style.display = "block";
+  }
+}
+$("#gate-btn").addEventListener("click", () => {
+  const v = $("#gate-input").value.trim();
+  if(v) tentarEntrar(v);
+});
+$("#gate-input").addEventListener("keydown", e => { if(e.key === "Enter") $("#gate-btn").click(); });
+
+(function initGate(){
+  const saved = localStorage.getItem(LS_KEY);
+  if(saved){
+    api("list_mentees").then(d => {
+      $("#gate").style.display = "none";
+      MENTORADOS = d.mentorados;
+    }).catch(() => { localStorage.removeItem(LS_KEY); });
+  }
+})();
+
+// ---------------- picker ----------------
+let MENTORADOS = [];
+async function carregarMentorados(){
+  const d = await api("list_mentees");
+  MENTORADOS = d.mentorados;
+}
+
+const buscaInput = $("#busca");
+const buscaResults = $("#busca-results");
+
+buscaInput.addEventListener("input", () => {
+  const q = buscaInput.value.trim().toLowerCase();
+  if(!q){ buscaResults.classList.remove("show"); return; }
+  const achados = MENTORADOS.filter(m =>
+    m.nome.toLowerCase().includes(q) || m.email.toLowerCase().includes(q)
+  ).slice(0, 30);
+  if(!achados.length){
+    buscaResults.innerHTML = '<div class="empty">Nenhum mentorado encontrado.</div>';
+  } else {
+    buscaResults.innerHTML = achados.map(m => `
+      <div class="opt" data-id="${esc(m.id)}">
+        <div class="n">${esc(m.nome)}</div>
+        <div class="e">${esc(m.email)}</div>
+      </div>
+    `).join("");
+  }
+  buscaResults.classList.add("show");
+});
+
+buscaResults.addEventListener("click", e => {
+  const opt = e.target.closest(".opt[data-id]");
+  if(!opt) return;
+  const m = MENTORADOS.find(x => x.id === opt.dataset.id);
+  buscaInput.value = m.nome;
+  buscaResults.classList.remove("show");
+  selecionarMentorado(m.id);
+});
+
+document.addEventListener("click", e => {
+  if(!e.target.closest(".picker")) buscaResults.classList.remove("show");
+});
+
+// ---------------- tabs ----------------
+$$(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    $$(".tab-btn").forEach(b => b.classList.remove("active"));
+    $$(".tab-panel").forEach(p => p.classList.remove("active"));
+    btn.classList.add("active");
+    $("#tab-" + btn.dataset.tab).classList.add("active");
+  });
+});
+
+// ---------------- carregar mentorado ----------------
+async function selecionarMentorado(id){
+  $("#estado-vazio").style.display = "none";
+  $("#estado-erro").style.display = "none";
+  $("#resultado").style.display = "none";
+  $("#estado-carregando").style.display = "block";
+  try{
+    const d = await api("mentee_data", {userId: id});
+    renderMentorado(d);
+    $("#estado-carregando").style.display = "none";
+    $("#resultado").style.display = "block";
+  }catch(e){
+    $("#estado-carregando").style.display = "none";
+    $("#estado-erro").textContent = "Não consegui carregar: " + e.message;
+    $("#estado-erro").style.display = "block";
+  }
+}
+
+function renderMentorado(d){
+  $("#m-nome").textContent = d.mentorado.nome;
+  $("#m-email").textContent = d.mentorado.email;
+
+  $("#cnt-progresso").textContent = d.progresso.length;
+  $("#cnt-formularios").textContent = d.formularios.length;
+  const totalRevisoes = d.revisoes.legado.length + d.revisoes.atual.length;
+  $("#cnt-revisoes").textContent = totalRevisoes;
+  $("#cnt-arquivos").textContent = d.arquivos.length;
+
+  renderProgresso(d.progresso);
+  renderFormularios(d.formularios);
+  renderRevisoes(d.revisoes);
+  renderArquivos(d.arquivos);
+}
+
+function renderProgresso(rows){
+  const el = $("#tab-progresso");
+  if(!rows.length){ el.innerHTML = '<div class="empty-tab">Sem checkpoints de progresso registrados.</div>'; return; }
+  el.innerHTML = rows.map(r => `
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">${esc(r.trail || "—")} · ${esc(r.checkpoint_key)}</div>
+        <span class="chip ${r.status === 'completed' ? 'chip-ok' : r.status === 'locked' ? 'chip-neutral' : 'chip-flag'}">${esc(r.status)}</span>
+      </div>
+      <div class="card-meta">
+        ${r.unlocked_at ? 'liberado em ' + fmtData(r.unlocked_at) : ''}
+        ${r.completed_at ? ' · concluído em ' + fmtData(r.completed_at) : ''}
+      </div>
+      ${r.mentor_notes ? `<div class="feedback-box">${esc(r.mentor_notes)}</div>` : ''}
+    </div>
+  `).join("");
+}
+
+function renderFormularios(rows){
+  const el = $("#tab-formularios");
+  if(!rows.length){ el.innerHTML = '<div class="empty-tab">Sem respostas de ferramenta.</div>'; return; }
+  el.innerHTML = rows.map(r => `
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">${esc(r.form_type)} ${r.is_current ? '' : '<span class="chip chip-neutral">versão antiga</span>'}</div>
+        <span class="chip ${r.status === 'submitted' ? 'chip-ok' : 'chip-neutral'}">${esc(r.status)} · v${esc(r.version)}</span>
+      </div>
+      <div class="card-meta">
+        atualizado em ${fmtData(r.updated_at)}
+        ${r.submitted_at ? ' · enviado em ' + fmtData(r.submitted_at) : ''}
+      </div>
+      ${r.mentor_feedback ? `<div class="feedback-box"><b>Parecer do mentor:</b><br>${esc(r.mentor_feedback)}</div>` : ''}
+    </div>
+  `).join("");
+}
+
+function renderRevisoes(rev){
+  const el = $("#tab-revisoes");
+  const todas = [
+    ...rev.atual.map(r => ({
+      quando: r.occurred_at, tipo: r.event_type, feedback: r.mentor_feedback,
+      quem: r.actor_email, campos: r.fields_to_correct, versao: 'v2 · rodada ' + r.round_no
+    })),
+    ...rev.legado.map(r => ({
+      quando: r.created_at, tipo: r.event_type, feedback: null,
+      quem: r.mentor_email, campos: r.fields_to_correct, versao: 'v1'
+    })),
+  ].sort((a,b) => (b.quando||"").localeCompare(a.quando||""));
+
+  if(!todas.length){ el.innerHTML = '<div class="empty-tab">Sem histórico de revisão.</div>'; return; }
+
+  const rotulo = {revision_requested:'Correção pedida', approved:'Aprovado', resubmitted:'Reenviado', submitted:'Enviado', revision_updated:'Correção atualizada'};
+  el.innerHTML = todas.map(r => `
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">${rotulo[r.tipo] || esc(r.tipo)}</div>
+        <span class="chip chip-neutral">${esc(r.versao)}</span>
+      </div>
+      <div class="card-meta">${fmtData(r.quando)}${r.quem ? ' · ' + esc(r.quem) : ''}</div>
+      ${r.campos && r.campos.length ? `<div class="card-body">Campos: ${r.campos.map(esc).join(", ")}</div>` : ''}
+      ${r.feedback ? `<div class="feedback-box">${esc(r.feedback)}</div>` : ''}
+    </div>
+  `).join("");
+}
+
+function renderArquivos(rows){
+  const el = $("#tab-arquivos");
+  if(!rows.length){ el.innerHTML = '<div class="empty-tab">Nenhum arquivo encontrado pra este mentorado.</div>'; return; }
+  el.innerHTML = rows.map((r, i) => `
+    <div class="file-row" data-path="${esc(r.path)}">
+      <div class="info">
+        <div class="fname">${esc(r.nome)}</div>
+        <div class="fmeta">
+          ${esc(r.tipo)} · enviado por ${esc(r.enviado_por)} · ${fmtData(r.data)}
+          ${r.tamanho ? ' · ' + fmtBytes(r.tamanho) : ''}
+          ${!r.catalogado ? ' · <span style="color:var(--flag)">não catalogado</span>' : ''}
+        </div>
+      </div>
+      <button class="btn-baixar">Baixar</button>
+    </div>
+  `).join("");
+
+  $$(".btn-baixar", el).forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const row = btn.closest(".file-row");
+      const path = row.dataset.path;
+      btn.disabled = true; btn.textContent = "gerando...";
+      try{
+        const d = await api("signed_url", {path});
+        window.open(d.url, "_blank");
+        btn.textContent = "Baixar";
+      }catch(e){
+        btn.textContent = "erro";
+        alert("Não consegui gerar o link: " + e.message);
+      }
+      btn.disabled = false;
+    });
+  });
+}
+</script>
+</body>
+</html>
