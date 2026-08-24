@@ -167,7 +167,26 @@
     padding:12px 14px; margin-top:6px;
   }
   .sub-bloco + .sub-bloco{margin-top:10px;}
-  .sub-bloco-titulo{font-size:12px; font-weight:700; color:var(--accent-2); margin-bottom:6px;}
+  .sub-bloco-titulo{font-size:12px; font-weight:700; color:var(--accent-2); margin-bottom:6px; display:flex; align-items:center; gap:6px;}
+
+  .modal-tabs{display:flex; gap:4px; margin-bottom:20px; border-bottom:1px solid var(--border);}
+  .modal-tab-btn{
+    padding:8px 12px; border:none; background:none; cursor:pointer; font-size:13.5px; color:var(--text-2);
+    border-bottom:2px solid transparent; font-family:inherit; font-weight:500;
+  }
+  .modal-tab-btn.active{color:var(--accent); border-bottom-color:var(--accent); font-weight:700;}
+
+  .diff-cap{display:block; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; font-weight:700; margin-bottom:3px; opacity:.8;}
+  .diff-old, .diff-new{border-radius:8px; padding:8px 10px; margin-bottom:4px; font-size:14px; white-space:pre-wrap; overflow-wrap:break-word;}
+  .diff-old{background:var(--flag-soft); border:1px solid var(--flag-soft-border); color:var(--flag); text-decoration:line-through; text-decoration-thickness:1px;}
+  .diff-new{background:var(--ok-soft); border:1px solid color-mix(in srgb, var(--ok) 35%, transparent); color:var(--ok);}
+  .diff-block{border-radius:8px; padding:10px 12px; margin-top:4px;}
+  .diff-block .diff-cap{color:inherit;}
+  .diff-added{background:var(--ok-soft); border:1px solid color-mix(in srgb, var(--ok) 35%, transparent);}
+  .diff-added .diff-cap{color:var(--ok);}
+  .diff-removed{background:var(--flag-soft); border:1px solid var(--flag-soft-border); opacity:.9;}
+  .diff-removed .diff-cap{color:var(--flag);}
+  .diff-empty{color:var(--text-3); font-size:14px; padding:16px 0;}
 
   @media (max-width:640px){
     .modal{padding:22px 18px 26px;}
@@ -233,6 +252,7 @@
     <button class="modal-close" id="modal-close" aria-label="Fechar">×</button>
     <h2 id="modal-title"></h2>
     <div id="modal-sub"></div>
+    <div id="modal-toggle"></div>
     <div id="modal-body"></div>
   </div>
 </div>
@@ -406,9 +426,18 @@ function renderProgresso(rows){
 }
 
 let FORM_ROWS = [];
+let FORM_BY_TYPE = {}; // form_type -> versões ordenadas da mais antiga pra mais nova
 
 function renderFormularios(rows){
   FORM_ROWS = rows;
+  FORM_BY_TYPE = {};
+  rows.forEach(r => {
+    (FORM_BY_TYPE[r.form_type] = FORM_BY_TYPE[r.form_type] || []).push(r);
+  });
+  Object.values(FORM_BY_TYPE).forEach(lista => {
+    lista.sort((a, b) => (a.version - b.version) || (a.updated_at || "").localeCompare(b.updated_at || ""));
+  });
+
   const el = $("#tab-formularios");
   if(!rows.length){ el.innerHTML = '<div class="empty-tab">Sem respostas de ferramenta.</div>'; return; }
   el.innerHTML = rows.map((r, i) => `
@@ -494,10 +523,110 @@ function renderCampos(obj, feedbackMap, nivel = 0){
   return partes.join("");
 }
 
+function versaoAnterior(r){
+  const lista = FORM_BY_TYPE[r.form_type] || [];
+  const idx = lista.findIndex(x => x.id === r.id);
+  return idx > 0 ? lista[idx - 1] : null;
+}
+
+function textoSimples(v){
+  if(Array.isArray(v)) return v.map(x => esc(String(x))).join(", ");
+  return esc(String(v)).replace(/\n/g, "<br>");
+}
+function iguais(a, b){ return JSON.stringify(a) === JSON.stringify(b); }
+function ehObjetoPlano(v){ return v && typeof v === "object" && !Array.isArray(v); }
+
+// diff entre dois "responses" — só mostra o que de fato mudou entre uma versão e a anterior
+function renderDiffCampos(oldObj, newObj){
+  const chaves = Array.from(new Set([...Object.keys(oldObj || {}), ...Object.keys(newObj || {})]))
+    .filter(k => !k.startsWith("__"));
+  return chaves.map(k => renderDiffCampo(k, (oldObj || {})[k], (newObj || {})[k])).filter(Boolean).join("");
+}
+
+function renderDiffCampo(chave, oldV, newV){
+  const oldVazio = vazio(oldV), newVazio = vazio(newV);
+  if(oldVazio && newVazio) return "";
+
+  if(oldVazio && !newVazio){
+    return `<div class="campo">
+      <div class="campo-label">${esc(humanizarChave(chave))} <span class="chip chip-ok" style="margin-left:6px;">novo</span></div>
+      <div class="diff-block diff-added"><span class="diff-cap">preenchido nesta versão</span>${renderValorCampo(newV, 0)}</div>
+    </div>`;
+  }
+  if(!oldVazio && newVazio){
+    return `<div class="campo">
+      <div class="campo-label">${esc(humanizarChave(chave))} <span class="chip chip-flag" style="margin-left:6px;">removido</span></div>
+      <div class="diff-block diff-removed"><span class="diff-cap">apagado nesta versão</span>${renderValorCampo(oldV, 0)}</div>
+    </div>`;
+  }
+  if(iguais(oldV, newV)) return "";
+
+  // listas de blocos (ex.: experiências, itens) — compara item a item pela posição
+  if(Array.isArray(oldV) && Array.isArray(newV) && oldV.every(ehObjetoPlano) && newV.every(ehObjetoPlano)){
+    const max = Math.max(oldV.length, newV.length);
+    const itens = [];
+    for(let i = 0; i < max; i++){
+      const a = oldV[i], b = newV[i];
+      if(a === undefined){
+        itens.push(`<div class="sub-bloco"><div class="sub-bloco-titulo">Item ${i + 1} <span class="chip chip-ok">novo</span></div>${renderCampos(b, {}, 1)}</div>`);
+      } else if(b === undefined){
+        itens.push(`<div class="sub-bloco"><div class="sub-bloco-titulo">Item ${i + 1} <span class="chip chip-flag">removido</span></div>${renderCampos(a, {}, 1)}</div>`);
+      } else if(!iguais(a, b)){
+        const dif = renderDiffCampos(a, b);
+        if(dif) itens.push(`<div class="sub-bloco"><div class="sub-bloco-titulo">Item ${i + 1}</div>${dif}</div>`);
+      }
+    }
+    if(!itens.length) return "";
+    return `<div class="campo"><div class="campo-label">${esc(humanizarChave(chave))}</div>${itens.join("")}</div>`;
+  }
+
+  // objeto aninhado — recursão, só mostra os campos internos que mudaram
+  if(ehObjetoPlano(oldV) && ehObjetoPlano(newV)){
+    const dif = renderDiffCampos(oldV, newV);
+    if(!dif) return "";
+    return `<div class="campo"><div class="campo-label">${esc(humanizarChave(chave))}</div><div class="sub-bloco">${dif}</div></div>`;
+  }
+
+  // valor simples (texto, número, lista de itens soltos) — antes/depois
+  return `<div class="campo">
+    <div class="campo-label">${esc(humanizarChave(chave))} <span class="chip chip-flag" style="margin-left:6px;">alterado</span></div>
+    <div class="diff-old"><span class="diff-cap">antes</span>${textoSimples(oldV)}</div>
+    <div class="diff-new"><span class="diff-cap">depois</span>${textoSimples(newV)}</div>
+  </div>`;
+}
+
+function renderDiffFormulario(anterior, atual){
+  const html = renderDiffCampos(anterior.responses || {}, atual.responses || {});
+  return html || '<div class="diff-empty">Nenhuma diferença encontrada entre esta versão e a anterior (v' + anterior.version + ').</div>';
+}
+
 function abrirModalFormulario(r){
+  const anterior = versaoAnterior(r);
   $("#modal-title").textContent = r.form_type;
   $("#modal-sub").textContent = `${r.status} · v${r.version} · atualizado em ${fmtData(r.updated_at)}`;
-  $("#modal-body").innerHTML = renderCampos(r.responses || {}, r.field_feedback || {});
+
+  const corpoConteudo = renderCampos(r.responses || {}, r.field_feedback || {});
+  const corpoDiff = anterior ? renderDiffFormulario(anterior, r) : "";
+
+  if(anterior){
+    $("#modal-toggle").innerHTML = `
+      <div class="modal-tabs">
+        <button class="modal-tab-btn active" data-view="conteudo">Conteúdo completo</button>
+        <button class="modal-tab-btn" data-view="diff">O que mudou desde a v${anterior.version}</button>
+      </div>
+    `;
+    $$(".modal-tab-btn", $("#modal-toggle")).forEach(btn => {
+      btn.addEventListener("click", () => {
+        $$(".modal-tab-btn", $("#modal-toggle")).forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        $("#modal-body").innerHTML = btn.dataset.view === "diff" ? corpoDiff : corpoConteudo;
+      });
+    });
+  } else {
+    $("#modal-toggle").innerHTML = "";
+  }
+
+  $("#modal-body").innerHTML = corpoConteudo;
   $("#modal-overlay").classList.add("show");
 }
 function fecharModal(){ $("#modal-overlay").classList.remove("show"); }
