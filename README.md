@@ -12,15 +12,17 @@ arquivos (upload do mentorado e upload feito pela equipe), com download.
 - `supabase/functions/staff-portal/` — função (Edge Function) hospedada no próprio projeto Supabase da
   Mentorado Platform. É ela quem de fato lê o banco, usando a chave de sistema — essa chave **nunca**
   fica neste repositório, só existe do lado do Supabase. A página só conversa com essa função.
-- O código de acesso mora dentro da função (`STAFF_ACCESS_KEY`, em `index.ts`) — pra revogar ou trocar,
-  editar essa constante e reimplantar a função no Supabase.
+- O código de acesso mora dentro da função (`STAFF_ACCESS_KEY`, em `index.ts`) — mas só na versão
+  **implantada** no Supabase. A cópia deste repositório mostra um placeholder de propósito, pra o valor
+  real nunca ficar salvo no histórico do git. Pra revogar ou trocar o código: editar o valor direto na
+  implantação (ou pedir pro Claude Code trocar) e reimplantar — não basta editar o arquivo aqui.
 
 ## Publicar / atualizar
 
 1. Ativar GitHub Pages neste repositório uma vez: **Settings → Pages → Deploy from a branch → `main` / `/ (root)`**.
 2. Qualquer alteração em `index.html` só precisa de commit + push nesta branch — o Pages atualiza sozinho.
 3. Alteração em `supabase/functions/staff-portal/index.ts` precisa ser reimplantada manualmente no
-  projeto Supabase (não é implantada automaticamente por este repositório).
+   projeto Supabase (não é implantada automaticamente por este repositório).
 
 ## Limitações conhecidas
 

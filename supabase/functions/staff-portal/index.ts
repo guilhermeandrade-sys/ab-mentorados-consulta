@@ -6,9 +6,11 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-// Senha única compartilhada com o time de operações. Trocar aqui e reimplantar a função
-// se precisar revogar/trocar o acesso — nunca fica no repositório da página (frontend).
-const STAFF_ACCESS_KEY = "travessia-travessia-farol-1471";
+// Senha única compartilhada com o time de operações. O valor real só existe na função
+// implantada no Supabase (Deploy → Functions → staff-portal) — não fica versionado aqui
+// de propósito, pra não vazar no histórico do git. Pra trocar: editar o valor direto na
+// implantação (ou pedir pro Claude Code fazer isso) e reimplantar.
+const STAFF_ACCESS_KEY = "___DEFINIDA_SÓ_NA_IMPLANTAÇÃO___";
 
 const BUCKET = "mentee-files";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
