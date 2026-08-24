@@ -169,9 +169,11 @@
   .sub-bloco + .sub-bloco{margin-top:10px;}
   .sub-bloco-titulo{font-size:12px; font-weight:700; color:var(--accent-2); margin-bottom:6px; display:flex; align-items:center; gap:6px;}
 
-  .rev-campo{margin-top:10px;}
-  .rev-campo:first-child{margin-top:0;}
+  .rev-campo{margin-top:14px; padding-top:12px; border-top:1px solid var(--border-soft);}
+  .rev-campo:first-child{margin-top:10px; padding-top:10px;}
   .rev-campo-nome{font-size:13.5px; font-weight:600;}
+  .rev-ferramenta{font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--accent-2); margin-bottom:2px;}
+  .rev-rotulo{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--text-3); margin:6px 0 2px;}
 
   .modal-tabs{display:flex; gap:4px; margin-bottom:20px; border-bottom:1px solid var(--border);}
   .modal-tab-btn{
@@ -638,56 +640,82 @@ $("#modal-overlay").addEventListener("click", e => { if(e.target.id === "modal-o
 $("#modal-close").addEventListener("click", fecharModal);
 document.addEventListener("keydown", e => { if(e.key === "Escape") fecharModal(); });
 
-// pra cada revisão mostra o comentário por campo (quando existe) — antes só aparecia
-// a lista crua de nomes de campo, e o comentário de verdade ficava escondido.
-function renderCamposRevisao(fieldFeedback, camposFallback){
+// pra cada revisão mostra, por campo: o texto que o mentorado tinha escrito naquele
+// momento + o que foi pedido pra corrigir. "respostasNaEpoca" vem da ferramenta ligada
+// a esse evento de revisão (mesmo form_response_id) — dá o "antes" pro pedido de "depois".
+function renderCamposRevisao(fieldFeedback, camposFallback, respostasNaEpoca){
+  const valorEnviado = k => (respostasNaEpoca ? respostasNaEpoca[k] : undefined);
+
   if(fieldFeedback){
     const linhas = Object.entries(fieldFeedback)
       .filter(([, v]) => v) // pula campo não tocado nesta rodada de revisão
-      .map(([k, v]) => `
-        <div class="rev-campo">
-          <span class="rev-campo-nome">${esc(humanizarChave(k))}</span>
-          ${v.status ? (BADGE_FEEDBACK[v.status] || "") : ""}
-          ${v.comment ? `<div class="feedback-box">${esc(v.comment)}</div>` : ""}
-        </div>
-      `);
+      .map(([k, v]) => {
+        const valor = valorEnviado(k);
+        return `
+          <div class="rev-campo">
+            <div><span class="rev-campo-nome">${esc(humanizarChave(k))}</span>${v.status ? (BADGE_FEEDBACK[v.status] || "") : ""}</div>
+            ${!vazio(valor) ? `<div class="rev-rotulo">o que o mentorado tinha escrito</div>${renderValorCampo(valor, 0)}` : ""}
+            ${v.comment ? `<div class="rev-rotulo">o que foi pedido</div><div class="feedback-box">${esc(v.comment)}</div>` : ""}
+          </div>
+        `;
+      });
     if(linhas.length) return linhas.join("");
   }
   if(camposFallback && camposFallback.length){
-    return `<div class="card-body">Campos: ${camposFallback.map(k => esc(humanizarChave(k))).join(", ")}</div>`;
+    return camposFallback.map(k => {
+      const valor = valorEnviado(k);
+      return `
+        <div class="rev-campo">
+          <span class="rev-campo-nome">${esc(humanizarChave(k))}</span>
+          ${!vazio(valor) ? `<div class="rev-rotulo">o que o mentorado tinha escrito</div>${renderValorCampo(valor, 0)}` : ""}
+        </div>
+      `;
+    }).join("");
   }
   return "";
 }
 
 function renderRevisoes(rev){
   const el = $("#tab-revisoes");
+
+  const porId = {};
+  FORM_ROWS.forEach(f => { porId[f.id] = f; });
+
   const todas = [
     ...rev.atual.map(r => ({
       quando: r.occurred_at, tipo: r.event_type, feedback: r.mentor_feedback,
       quem: r.actor_email, campos: r.fields_to_correct, fieldFeedback: r.field_feedback,
-      versao: 'v2 · rodada ' + r.round_no
+      formResponseId: r.form_response_id, versao: 'v2 · rodada ' + r.round_no
     })),
     ...rev.legado.map(r => ({
       quando: r.created_at, tipo: r.event_type, feedback: null,
       quem: r.mentor_email, campos: r.fields_to_correct, fieldFeedback: null,
-      versao: 'v1'
+      formResponseId: r.form_response_id, formTypeDireto: r.form_type, versao: 'v1'
     })),
   ].sort((a,b) => (b.quando||"").localeCompare(a.quando||""));
 
   if(!todas.length){ el.innerHTML = '<div class="empty-tab">Sem histórico de revisão.</div>'; return; }
 
   const rotulo = {revision_requested:'Correção pedida', approved:'Aprovado', resubmitted:'Reenviado', submitted:'Enviado', revision_updated:'Correção atualizada'};
-  el.innerHTML = todas.map(r => `
+  el.innerHTML = todas.map(r => {
+    const relacionado = porId[r.formResponseId];
+    const ferramenta = r.formTypeDireto || (relacionado && relacionado.form_type) || "(ferramenta não identificada)";
+    const respostasNaEpoca = relacionado ? relacionado.responses : null;
+    return `
     <div class="card">
       <div class="card-head">
-        <div class="card-title">${rotulo[r.tipo] || esc(r.tipo)}</div>
+        <div>
+          <div class="rev-ferramenta">${esc(ferramenta)}</div>
+          <div class="card-title">${rotulo[r.tipo] || esc(r.tipo)}</div>
+        </div>
         <span class="chip chip-neutral">${esc(r.versao)}</span>
       </div>
       <div class="card-meta">${fmtData(r.quando)}${r.quem ? ' · ' + esc(r.quem) : ''}</div>
-      ${renderCamposRevisao(r.fieldFeedback, r.campos)}
-      ${r.feedback ? `<div class="feedback-box">${esc(r.feedback)}</div>` : ''}
+      ${renderCamposRevisao(r.fieldFeedback, r.campos, respostasNaEpoca)}
+      ${r.feedback ? `<div class="rev-rotulo">parecer geral</div><div class="feedback-box">${esc(r.feedback)}</div>` : ''}
     </div>
-  `).join("");
+  `;
+  }).join("");
 }
 
 function renderArquivos(rows){
