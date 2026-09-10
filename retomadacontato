@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Aprovação de Reativação de Leads — AB Carreiras</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f6f5f2;
+    --card: #ffffff;
+    --border: #e2ddd3;
+    --text: #2b2620;
+    --muted: #837b6d;
+    --accent: #a9722f;
+    --accent-dark: #8a5a1f;
+    --green: #3f7d3f;
+    --green-bg: #eaf3ea;
+    --red: #a13d3d;
+    --red-bg: #f6eaea;
+    --amber-bg: #fbf1de;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding-block: 24px;
+    padding-inline: 20px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tab {
+    border: 1px solid var(--border);
+    background: var(--card);
+    border-radius: 999px;
+    padding: 6px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .name-input {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .name-input input {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 13px;
+    width: 160px;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .card-head {
+    padding: 14px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    gap: 12px;
+  }
+  .card-head:hover { background: #fbfaf7; }
+  .lead-name { font-weight: 600; font-size: 15px; }
+  .lead-meta { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .badge {
+    display: inline-block;
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge-alta { background: var(--amber-bg); color: var(--accent-dark); }
+  .badge-normal { background: #eef0f4; color: #4a5568; }
+  .badge-pendente { background: var(--amber-bg); color: var(--accent-dark); }
+  .badge-aprovado { background: var(--green-bg); color: var(--green); }
+  .badge-rejeitado { background: var(--red-bg); color: var(--red); }
+
+  .card-body { padding: 0 16px 16px; display: none; border-top: 1px solid var(--border); }
+  .card.open .card-body { display: block; padding-top: 14px; }
+  .card.open .chevron { transform: rotate(90deg); }
+  .chevron { transition: transform 0.15s; color: var(--muted); }
+
+  .section-title {
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    margin: 14px 0 4px;
+  }
+  .section-title:first-child { margin-top: 0; }
+  .field-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 6px 16px;
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+  .field-grid div span { color: var(--muted); }
+  .text-block {
+    background: #faf9f6;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    white-space: pre-wrap;
+    font-size: 13px;
+  }
+  .variant {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    white-space: pre-wrap;
+  }
+  .variant:hover { border-color: var(--accent); }
+  .variant.selected { border-color: var(--accent); background: var(--amber-bg); }
+  .variant-label { font-size: 11px; font-weight: 700; color: var(--accent-dark); margin-bottom: 4px; text-transform: uppercase; }
+
+  textarea.final-msg {
+    width: 100%;
+    min-height: 90px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: inherit;
+    font-size: 13px;
+    resize: vertical;
+  }
+
+  .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  button {
+    border: none;
+    border-radius: 7px;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-approve { background: var(--green); color: #fff; }
+  .btn-reject { background: var(--red); color: #fff; }
+  .btn-reset { background: #eee; color: #444; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .decided-note {
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border);
+  }
+
+  .empty { text-align: center; color: var(--muted); padding: 40px 0; }
+  a { color: var(--accent-dark); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Aprovação de Reativação de Leads</h1>
+  <p class="sub">AB Carreiras — revise o resumo de cada lead e aprove a mensagem de reconexão antes do envio.</p>
+
+  <div class="toolbar">
+    <div class="tabs" id="tabs">
+      <div class="tab active" data-status="pendente">Pendentes</div>
+      <div class="tab" data-status="aprovado">Aprovados</div>
+      <div class="tab" data-status="rejeitado">Rejeitados</div>
+      <div class="tab" data-status="todos">Todos</div>
+    </div>
+    <div class="name-input">
+      Seu nome:
+      <input type="text" id="approverName" placeholder="ex: Aline" />
+    </div>
+  </div>
+
+  <div id="list"></div>
+</div>
+
+<script>
+var ROUTE_BASE = "https://crwyhklydsgjnclqetio.supabase.co/functions/v1/aprovacao-leads";
+var currentStatus = "pendente";
+var leads = [];
+
+var nameInput = document.getElementById("approverName");
+nameInput.value = sessionStorage.getItem("approverName") || "";
+nameInput.addEventListener("input", function () {
+  sessionStorage.setItem("approverName", nameInput.value);
+});
+
+document.getElementById("tabs").addEventListener("click", function (e) {
+  var tab = e.target.closest(".tab");
+  if (!tab) return;
+  document.querySelectorAll(".tab").forEach(function (t) { t.classList.remove("active"); });
+  tab.classList.add("active");
+  currentStatus = tab.dataset.status;
+  loadLeads();
+});
+
+function escapeHtml(s) {
+  var map = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return map[c]; });
+}
+
+function badgeForScore(score) {
+  if (!score) return "";
+  var cls = /alta/i.test(score) ? "badge-alta" : "badge-normal";
+  return '<span class="badge ' + cls + '">' + escapeHtml(score) + "</span>";
+}
+
+function badgeForStatus(status) {
+  var cls = "badge-" + status;
+  return '<span class="badge ' + cls + '">' + escapeHtml(status) + "</span>";
+}
+
+async function loadLeads() {
+  var list = document.getElementById("list");
+  list.innerHTML = '<div class="empty">Carregando...</div>';
+  try {
+    var res = await fetch(ROUTE_BASE + "/api/leads?status=" + currentStatus);
+    var data = await res.json();
+    if (data.error) throw new Error(data.error);
+    leads = data.leads || [];
+    render();
+  } catch (err) {
+    list.innerHTML = '<div class="empty">Erro ao carregar: ' + escapeHtml(String(err)) + '</div>';
+  }
+}
+
+function render() {
+  var list = document.getElementById("list");
+  if (leads.length === 0) {
+    list.innerHTML = '<div class="empty">Nenhum lead nesta categoria.</div>';
+    return;
+  }
+  list.innerHTML = leads.map(leadCardHtml).join("");
+}
+
+function leadCardHtml(lead) {
+  var variants = [lead.mensagem_variante_1, lead.mensagem_variante_2, lead.mensagem_variante_3];
+  var parts = [];
+  for (var i = 0; i < variants.length; i++) {
+    var v = variants[i];
+    if (!v) continue;
+    parts.push('<div class="variant" data-action="select-variant" data-id="' + lead.id + '" data-idx="' + (i + 1) + '">');
+    parts.push('<div class="variant-label">Variante ' + (i + 1) + '</div>');
+    parts.push(escapeHtml(v));
+    parts.push('</div>');
+  }
+  var variantsHtml = parts.join("");
+
+  var decisionHtml;
+  if (lead.status_aprovacao === "pendente") {
+    decisionHtml = '<div class="actions">'
+      + '<button class="btn-approve" data-action="approve" data-id="' + lead.id + '">Aprovar</button>'
+      + '<button class="btn-reject" data-action="reject" data-id="' + lead.id + '">Rejeitar</button>'
+      + '</div>';
+  } else {
+    decisionHtml = '<div class="decided-note">Decisão: <strong>' + escapeHtml(lead.status_aprovacao) + '</strong>'
+      + (lead.aprovado_por ? " por " + escapeHtml(lead.aprovado_por) : "")
+      + (lead.aprovado_em ? " em " + new Date(lead.aprovado_em).toLocaleString("pt-BR") : "")
+      + (lead.variante_escolhida ? " · variante " + lead.variante_escolhida : "")
+      + '</div><div class="actions"><button class="btn-reset" data-action="undo" data-id="' + lead.id + '">Desfazer / voltar para pendente</button></div>';
+  }
+
+  var out = '<div class="card" id="card-' + lead.id + '">'
+    + '<div class="card-head" data-action="toggle" data-id="' + lead.id + '">'
+    + '<div><div class="lead-name">' + escapeHtml(lead.nome_lead || lead.email) + '</div>'
+    + '<div class="lead-meta">' + escapeHtml(lead.email) + ' · closer: ' + escapeHtml(lead.closer_sdr_original || "-") + ' · ' + escapeHtml(lead.meses_desde_reuniao || "") + ' meses desde a reunião</div></div>'
+    + '<div style="display:flex;align-items:center;gap:8px;">' + badgeForScore(lead.score_potencial) + badgeForStatus(lead.status_aprovacao) + '<span class="chevron">▶</span></div>'
+    + '</div>'
+    + '<div class="card-body">'
+    + '<div class="section-title">Resumo</div>'
+    + '<div class="field-grid">'
+    + '<div><span>Etapa travada: </span>' + escapeHtml(lead.etapa_travada || "-") + '</div>'
+    + '<div><span>Objeção principal: </span>' + escapeHtml(lead.objecao_principal || "-") + '</div>'
+    + '<div><span>Sinal de fechamento: </span>' + escapeHtml(lead.sinal_fechamento_no_alinhamento || "-") + '</div>'
+    + '<div><span>Apto para contato: </span>' + escapeHtml(lead.apto_para_contato || "-") + '</div>'
+    + '<div><span>Aderência ICP: </span>' + escapeHtml(lead.aderencia_icp || "-") + '</div>'
+    + '<div><span>Nota (escala): </span>' + escapeHtml(lead.nota_escala || "-") + '</div>'
+    + '<div><span>Telefone: </span>' + escapeHtml(lead.telefone || "-") + '</div>'
+    + '<div><span>Datas reuniões: </span>' + escapeHtml(lead.datas_reunioes || "-") + '</div>'
+    + '</div>'
+    + (lead.justificativa_score ? '<div class="section-title">Justificativa do score</div><div class="text-block">' + escapeHtml(lead.justificativa_score) + '</div>' : "")
+    + (lead.resumo_se ? '<div class="section-title">Resumo — Sessão Estratégica</div><div class="text-block">' + escapeHtml(lead.resumo_se) + '</div>' : "")
+    + (lead.resumo_alinhamento_1 ? '<div class="section-title">Resumo — Alinhamento 1</div><div class="text-block">' + escapeHtml(lead.resumo_alinhamento_1) + '</div>' : "")
+    + (lead.resumo_alinhamento_2 ? '<div class="section-title">Resumo — Alinhamento 2</div><div class="text-block">' + escapeHtml(lead.resumo_alinhamento_2) + '</div>' : "")
+    + (lead.link_ultima_reuniao ? '<div class="section-title">Gravação</div><div><a href="' + escapeHtml(lead.link_ultima_reuniao) + '" target="_blank" rel="noopener">Abrir última reunião ↗</a></div>' : "")
+    + '<div class="section-title">Mensagem de reconexão — escolha uma variante</div>'
+    + variantsHtml
+    + '<div class="section-title">Mensagem final (editável)</div>'
+    + '<textarea class="final-msg" id="final-' + lead.id + '" data-id="' + lead.id + '" placeholder="Selecione uma variante acima ou escreva a mensagem final aqui">' + escapeHtml(lead.mensagem_final || "") + '</textarea>'
+    + decisionHtml
+    + '</div></div>';
+
+  return out;
+}
+
+document.getElementById("list").addEventListener("click", function (e) {
+  var el = e.target.closest("[data-action]");
+  if (!el) return;
+  var action = el.dataset.action;
+  var id = Number(el.dataset.id);
+
+  if (action === "toggle") {
+    document.getElementById("card-" + id).classList.toggle("open");
+  } else if (action === "select-variant") {
+    selectVariant(id, Number(el.dataset.idx));
+  } else if (action === "approve") {
+    decide(id, "aprovado");
+  } else if (action === "reject") {
+    decide(id, "rejeitado");
+  } else if (action === "undo") {
+    resetDecision(id);
+  }
+});
+
+function selectVariant(id, idx) {
+  var card = document.getElementById("card-" + id);
+  card.querySelectorAll(".variant").forEach(function (v) { v.classList.remove("selected"); });
+  var chosen = card.querySelector('.variant[data-idx="' + idx + '"]');
+  if (chosen) chosen.classList.add("selected");
+  var lead = leads.find(function (l) { return l.id === id; });
+  var variantText = lead["mensagem_variante_" + idx];
+  document.getElementById("final-" + id).value = variantText || "";
+  card.dataset.selectedVariant = idx;
+}
+
+async function decide(id, decision) {
+  var card = document.getElementById("card-" + id);
+  var finalMsg = document.getElementById("final-" + id).value.trim();
+  var approverName = nameInput.value.trim();
+
+  if (decision === "aprovado" && !finalMsg) {
+    alert("Escolha uma variante ou escreva a mensagem final antes de aprovar.");
+    return;
+  }
+  if (!approverName) {
+    alert("Informe seu nome no topo da página antes de decidir.");
+    return;
+  }
+
+  var variante = card.dataset.selectedVariant ? Number(card.dataset.selectedVariant) : null;
+
+  var res = await fetch(ROUTE_BASE + "/api/leads/" + id + "/decision", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      decision: decision,
+      variante_escolhida: variante,
+      mensagem_final: decision === "aprovado" ? finalMsg : null,
+      aprovado_por: approverName,
+    }),
+  });
+  var data = await res.json();
+  if (data.error) {
+    alert("Erro: " + data.error);
+    return;
+  }
+  loadLeads();
+}
+
+async function resetDecision(id) {
+  if (!confirm("Voltar este lead para pendente?")) return;
+  var res = await fetch(ROUTE_BASE + "/api/leads/" + id + "/reset", { method: "POST" });
+  var data = await res.json();
+  if (data.error) {
+    alert("Erro: " + data.error);
+    return;
+  }
+  loadLeads();
+}
+
+loadLeads();
+</script>
+</body>
+</html>
