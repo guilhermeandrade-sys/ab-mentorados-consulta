@@ -97,9 +97,12 @@
   }
   .badge-alta { background: var(--amber-bg); color: var(--accent-dark); }
   .badge-normal { background: #eef0f4; color: #4a5568; }
+  .badge-baixa { background: #f1eef4; color: #6b5a7a; }
+  .badge-na { background: #eeeeee; color: #777; }
   .badge-pendente { background: var(--amber-bg); color: var(--accent-dark); }
   .badge-aprovado { background: var(--green-bg); color: var(--green); }
   .badge-rejeitado { background: var(--red-bg); color: var(--red); }
+  .badge-nao_aplicavel { background: #eeeeee; color: #555; }
 
   .card-body { padding: 0 16px 16px; display: none; border-top: 1px solid var(--border); }
   .card.open .card-body { display: block; padding-top: 14px; }
@@ -165,8 +168,25 @@
   }
   .btn-approve { background: var(--green); color: #fff; }
   .btn-reject { background: var(--red); color: #fff; }
+  .btn-na { background: #6b6b6b; color: #fff; }
   .btn-reset { background: #eee; color: #444; }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .priority-filter {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .priority-filter select {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 13px;
+    background: var(--card);
+    color: var(--text);
+  }
 
   .decided-note {
     font-size: 12.5px;
@@ -190,7 +210,18 @@
       <div class="tab active" data-status="pendente">Pendentes</div>
       <div class="tab" data-status="aprovado">Aprovados</div>
       <div class="tab" data-status="rejeitado">Rejeitados</div>
+      <div class="tab" data-status="nao_aplicavel">Não aplicável</div>
       <div class="tab" data-status="todos">Todos</div>
+    </div>
+    <div class="priority-filter">
+      Prioridade:
+      <select id="priorityFilter">
+        <option value="todas">Todas</option>
+        <option value="alta">Alta</option>
+        <option value="normal">Normal</option>
+        <option value="baixa">Baixa</option>
+        <option value="na">N/A / excluída</option>
+      </select>
     </div>
     <div class="name-input">
       Seu nome:
@@ -221,6 +252,23 @@ document.getElementById("tabs").addEventListener("click", function (e) {
   loadLeads();
 });
 
+var currentPriority = "todas";
+var priorityFilter = document.getElementById("priorityFilter");
+priorityFilter.addEventListener("change", function () {
+  currentPriority = priorityFilter.value;
+  render();
+});
+
+function priorityBucket(score) {
+  var s = (score || "").toString().trim();
+  if (!s) return "na";
+  if (/^n\/?a\b|^nao\b/i.test(s)) return "na";
+  if (/alta/i.test(s)) return "alta";
+  if (/normal/i.test(s)) return "normal";
+  if (/baixa/i.test(s)) return "baixa";
+  return "na";
+}
+
 function escapeHtml(s) {
   var map = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
   return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return map[c]; });
@@ -228,7 +276,8 @@ function escapeHtml(s) {
 
 function badgeForScore(score) {
   if (!score) return "";
-  var cls = /alta/i.test(score) ? "badge-alta" : "badge-normal";
+  var bucket = priorityBucket(score);
+  var cls = "badge-" + (bucket === "na" ? "na" : bucket);
   return '<span class="badge ' + cls + '">' + escapeHtml(score) + "</span>";
 }
 
@@ -253,11 +302,15 @@ async function loadLeads() {
 
 function render() {
   var list = document.getElementById("list");
-  if (leads.length === 0) {
+  var filtered = leads;
+  if (currentPriority !== "todas") {
+    filtered = leads.filter(function (l) { return priorityBucket(l.score_potencial) === currentPriority; });
+  }
+  if (filtered.length === 0) {
     list.innerHTML = '<div class="empty">Nenhum lead nesta categoria.</div>';
     return;
   }
-  list.innerHTML = leads.map(leadCardHtml).join("");
+  list.innerHTML = filtered.map(leadCardHtml).join("");
 }
 
 function leadCardHtml(lead) {
@@ -278,12 +331,14 @@ function leadCardHtml(lead) {
     decisionHtml = '<div class="actions">'
       + '<button class="btn-approve" data-action="approve" data-id="' + lead.id + '">Aprovar</button>'
       + '<button class="btn-reject" data-action="reject" data-id="' + lead.id + '">Rejeitar</button>'
+      + '<button class="btn-na" data-action="nao-aplicavel" data-id="' + lead.id + '">Não aplicável</button>'
       + '</div>';
   } else {
     decisionHtml = '<div class="decided-note">Decisão: <strong>' + escapeHtml(lead.status_aprovacao) + '</strong>'
       + (lead.aprovado_por ? " por " + escapeHtml(lead.aprovado_por) : "")
       + (lead.aprovado_em ? " em " + new Date(lead.aprovado_em).toLocaleString("pt-BR") : "")
       + (lead.variante_escolhida ? " · variante " + lead.variante_escolhida : "")
+      + (lead.motivo_nao_aplicavel ? '<br>Motivo: ' + escapeHtml(lead.motivo_nao_aplicavel) : "")
       + '</div><div class="actions"><button class="btn-reset" data-action="undo" data-id="' + lead.id + '">Desfazer / voltar para pendente</button></div>';
   }
 
@@ -334,6 +389,8 @@ document.getElementById("list").addEventListener("click", function (e) {
     decide(id, "aprovado");
   } else if (action === "reject") {
     decide(id, "rejeitado");
+  } else if (action === "nao-aplicavel") {
+    decide(id, "nao_aplicavel");
   } else if (action === "undo") {
     resetDecision(id);
   }
@@ -364,6 +421,17 @@ async function decide(id, decision) {
     return;
   }
 
+  var motivo = null;
+  if (decision === "nao_aplicavel") {
+    motivo = prompt("Motivo para marcar como não aplicável (ex: já é cliente, contato errado):");
+    if (motivo === null) return;
+    motivo = motivo.trim();
+    if (!motivo) {
+      alert("Informe um motivo para marcar como não aplicável.");
+      return;
+    }
+  }
+
   var variante = card.dataset.selectedVariant ? Number(card.dataset.selectedVariant) : null;
 
   var res = await fetch(ROUTE_BASE + "/api/leads/" + id + "/decision", {
@@ -374,6 +442,7 @@ async function decide(id, decision) {
       variante_escolhida: variante,
       mensagem_final: decision === "aprovado" ? finalMsg : null,
       aprovado_por: approverName,
+      motivo: motivo,
     }),
   });
   var data = await res.json();
