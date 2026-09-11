@@ -226,6 +226,38 @@
         <option value="na">N/A / excluída</option>
       </select>
     </div>
+    <div class="priority-filter">
+      Closer:
+      <select id="closerFilter">
+        <option value="todos">Todos</option>
+        <option value="Aline Bruzon">Aline Bruzon</option>
+        <option value="Alessandra Conceição">Alessandra Conceição</option>
+        <option value="Guilherme Andrade">Guilherme Andrade</option>
+        <option value="Polyanna Bruno">Polyanna Bruno</option>
+      </select>
+    </div>
+    <div class="priority-filter">
+      Salário:
+      <select id="salaryFilter">
+        <option value="todas">Todas</option>
+        <option value="0 a 5k">0 a 5k</option>
+        <option value="5 a 10k">5 a 10k</option>
+        <option value="10 a 15k">10 a 15k</option>
+        <option value="15 a 20k">15 a 20k</option>
+        <option value="20 a 30k">20 a 30k</option>
+        <option value="Acima de 30k">Acima de 30k</option>
+        <option value="Não informado">Não informado</option>
+      </select>
+    </div>
+    <div class="priority-filter">
+      Mês da SE:
+      <select id="monthFilter">
+        <option value="todos">Todos</option>
+      </select>
+    </div>
+    <div class="priority-filter">
+      <input type="text" id="searchBox" placeholder="Buscar nome ou e-mail..." style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:13px;width:180px;" />
+    </div>
     <div class="name-input">
       Seu nome:
       <input type="text" id="approverName" placeholder="ex: Aline" />
@@ -262,6 +294,58 @@ priorityFilter.addEventListener("change", function () {
   render();
 });
 
+var currentCloser = "todos";
+var closerFilter = document.getElementById("closerFilter");
+closerFilter.addEventListener("change", function () {
+  currentCloser = closerFilter.value;
+  render();
+});
+
+var currentSalary = "todas";
+var salaryFilter = document.getElementById("salaryFilter");
+salaryFilter.addEventListener("change", function () {
+  currentSalary = salaryFilter.value;
+  render();
+});
+
+var currentMonth = "todos";
+var monthFilter = document.getElementById("monthFilter");
+monthFilter.addEventListener("change", function () {
+  currentMonth = monthFilter.value;
+  render();
+});
+
+var currentSearch = "";
+var searchBox = document.getElementById("searchBox");
+var searchDebounce = null;
+searchBox.addEventListener("input", function () {
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(function () {
+    currentSearch = searchBox.value.trim().toLowerCase();
+    render();
+  }, 200);
+});
+
+function monthLabel(iso) {
+  var parts = iso.split("-");
+  var meses = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  return meses[Number(parts[1]) - 1] + "/" + parts[0];
+}
+
+function rebuildMonthOptions() {
+  var months = {};
+  leads.forEach(function (l) {
+    if (l.data_se) months[l.data_se.slice(0, 7)] = true;
+  });
+  var keys = Object.keys(months).sort();
+  var prevValue = monthFilter.value;
+  monthFilter.innerHTML = '<option value="todos">Todos</option>' + keys.map(function (k) {
+    return '<option value="' + k + '">' + monthLabel(k) + "</option>";
+  }).join("");
+  if (keys.indexOf(prevValue) !== -1) monthFilter.value = prevValue;
+  else currentMonth = "todos";
+}
+
 function priorityBucket(score) {
   var s = (score || "").toString().trim();
   if (!s) return "na";
@@ -297,6 +381,7 @@ async function loadLeads() {
     var data = await res.json();
     if (data.error) throw new Error(data.error);
     leads = data.leads || [];
+    rebuildMonthOptions();
     render();
   } catch (err) {
     list.innerHTML = '<div class="empty">Erro ao carregar: ' + escapeHtml(String(err)) + '</div>';
@@ -305,10 +390,22 @@ async function loadLeads() {
 
 function render() {
   var list = document.getElementById("list");
-  var filtered = leads;
-  if (currentPriority !== "todas") {
-    filtered = leads.filter(function (l) { return priorityBucket(l.score_potencial) === currentPriority; });
-  }
+  var filtered = leads.filter(function (l) {
+    if (currentPriority !== "todas" && priorityBucket(l.score_potencial) !== currentPriority) return false;
+    if (currentCloser !== "todos" && l.closer_sdr_original !== currentCloser) return false;
+    if (currentSalary !== "todas") {
+      var sal = l.remuneracao_mensal || "Não informado";
+      if (sal !== currentSalary) return false;
+    }
+    if (currentMonth !== "todos") {
+      if (!l.data_se || l.data_se.slice(0, 7) !== currentMonth) return false;
+    }
+    if (currentSearch) {
+      var haystack = ((l.nome_lead || "") + " " + (l.email || "")).toLowerCase();
+      if (haystack.indexOf(currentSearch) === -1) return false;
+    }
+    return true;
+  });
   if (filtered.length === 0) {
     list.innerHTML = '<div class="empty">Nenhum lead nesta categoria.</div>';
     return;
@@ -380,6 +477,8 @@ function leadCardHtml(lead) {
     + '<div><span>Nota (escala): </span>' + escapeHtml(lead.nota_escala || "-") + '</div>'
     + '<div><span>Telefone: </span>' + escapeHtml(lead.telefone || "-") + '</div>'
     + '<div><span>Datas reuniões: </span>' + escapeHtml(lead.datas_reunioes || "-") + '</div>'
+    + '<div><span>Data da SE (CRM): </span>' + (lead.data_se ? new Date(lead.data_se + "T00:00:00").toLocaleDateString("pt-BR") : "-") + '</div>'
+    + '<div><span>Remuneração mensal: </span>' + escapeHtml(lead.remuneracao_mensal || "-") + '</div>'
     + '</div>'
     + (lead.justificativa_score ? '<div class="section-title">Justificativa do score</div><div class="text-block">' + escapeHtml(lead.justificativa_score) + '</div>' : "")
     + (lead.resumo_se ? '<div class="section-title">Resumo — Sessão Estratégica</div><div class="text-block">' + escapeHtml(lead.resumo_se) + '</div>' : "")
