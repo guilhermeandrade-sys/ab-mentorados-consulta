@@ -476,9 +476,12 @@ function leadCardHtml(lead) {
     + '<div><span>Aderência ICP: </span>' + escapeHtml(lead.aderencia_icp || "-") + '</div>'
     + '<div><span>Nota (escala): </span>' + escapeHtml(lead.nota_escala || "-") + '</div>'
     + '<div><span>Telefone: </span>' + escapeHtml(lead.telefone || "-") + '</div>'
+    + '<div><span>Cargo: </span>' + escapeHtml(lead.cargo || "-") + '</div>'
     + '<div><span>Datas reuniões: </span>' + escapeHtml(lead.datas_reunioes || "-") + '</div>'
     + '<div><span>Data da SE (CRM): </span>' + (lead.data_se ? new Date(lead.data_se + "T00:00:00").toLocaleDateString("pt-BR") : "-") + '</div>'
     + '<div><span>Remuneração mensal: </span>' + escapeHtml(lead.remuneracao_mensal || "-") + '</div>'
+    + (lead.linkedin_url ? '<div><span>LinkedIn: </span><a href="' + escapeHtml(lead.linkedin_url) + '" target="_blank" rel="noopener">abrir perfil ↗</a></div>' : "")
+    + (lead.deal_id_crm ? '<div><span>CRM: </span><a href="https://app.pipe.run/pipeline/gerenciador/visualizar/' + lead.deal_id_crm + '" target="_blank" rel="noopener">abrir oportunidade ↗</a></div>' : "")
     + '</div>'
     + (lead.justificativa_score ? '<div class="section-title">Justificativa do score</div><div class="text-block">' + escapeHtml(lead.justificativa_score) + '</div>' : "")
     + (lead.resumo_se ? '<div class="section-title">Resumo — Sessão Estratégica</div><div class="text-block">' + escapeHtml(lead.resumo_se) + '</div>' : "")
