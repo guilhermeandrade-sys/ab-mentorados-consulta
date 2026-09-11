@@ -258,6 +258,20 @@
     <div class="priority-filter">
       <input type="text" id="searchBox" placeholder="Buscar nome ou e-mail..." style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:13px;width:180px;" />
     </div>
+    <div class="priority-filter">
+      Envio:
+      <select id="envioFilter">
+        <option value="todos">Todos</option>
+        <option value="aguardando">Aguardando envio</option>
+        <option value="enviado">Já enviado</option>
+      </select>
+    </div>
+    <div class="priority-filter">
+      Enviado de:
+      <input type="date" id="sentFrom" style="border:1px solid var(--border);border-radius:6px;padding:5px 6px;font-size:13px;" />
+      até
+      <input type="date" id="sentTo" style="border:1px solid var(--border);border-radius:6px;padding:5px 6px;font-size:13px;" />
+    </div>
     <div class="name-input">
       Seu nome:
       <input type="text" id="approverName" placeholder="ex: Aline" />
@@ -325,6 +339,18 @@ searchBox.addEventListener("input", function () {
     render();
   }, 200);
 });
+
+var currentEnvio = "todos";
+var envioFilter = document.getElementById("envioFilter");
+envioFilter.addEventListener("change", function () {
+  currentEnvio = envioFilter.value;
+  render();
+});
+
+var sentFrom = document.getElementById("sentFrom");
+var sentTo = document.getElementById("sentTo");
+sentFrom.addEventListener("change", render);
+sentTo.addEventListener("change", render);
 
 function monthLabel(iso) {
   var parts = iso.split("-");
@@ -403,6 +429,14 @@ function render() {
     if (currentSearch) {
       var haystack = ((l.nome_lead || "") + " " + (l.email || "")).toLowerCase();
       if (haystack.indexOf(currentSearch) === -1) return false;
+    }
+    if (currentEnvio === "aguardando" && l.status_envio === "enviado") return false;
+    if (currentEnvio === "enviado" && l.status_envio !== "enviado") return false;
+    if (sentFrom.value || sentTo.value) {
+      if (!l.enviado_em) return false;
+      var sentDate = l.enviado_em.slice(0, 10);
+      if (sentFrom.value && sentDate < sentFrom.value) return false;
+      if (sentTo.value && sentDate > sentTo.value) return false;
     }
     return true;
   });
