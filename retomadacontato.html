@@ -170,6 +170,9 @@
   .btn-reject { background: var(--red); color: #fff; }
   .btn-na { background: #6b6b6b; color: #fff; }
   .btn-reset { background: #eee; color: #444; }
+  .btn-enviado { background: var(--accent); color: #fff; }
+  .btn-desfazer-envio { background: #eee; color: #444; }
+  .badge-enviado { background: var(--green-bg); color: var(--green); }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .priority-filter {
@@ -334,12 +337,30 @@ function leadCardHtml(lead) {
       + '<button class="btn-na" data-action="nao-aplicavel" data-id="' + lead.id + '">Não aplicável</button>'
       + '</div>';
   } else {
+    var envioHtml = "";
+    if (lead.status_aprovacao === "aprovado") {
+      if (lead.status_envio === "enviado") {
+        envioHtml = '<br><span class="badge badge-enviado">Enviado</span>'
+          + (lead.enviado_em ? " em " + new Date(lead.enviado_em).toLocaleString("pt-BR") : "");
+      } else {
+        envioHtml = '<br><span class="badge">Ainda não enviado</span>';
+      }
+    }
     decisionHtml = '<div class="decided-note">Decisão: <strong>' + escapeHtml(lead.status_aprovacao) + '</strong>'
       + (lead.aprovado_por ? " por " + escapeHtml(lead.aprovado_por) : "")
       + (lead.aprovado_em ? " em " + new Date(lead.aprovado_em).toLocaleString("pt-BR") : "")
       + (lead.variante_escolhida ? " · variante " + lead.variante_escolhida : "")
       + (lead.motivo_nao_aplicavel ? '<br>Motivo: ' + escapeHtml(lead.motivo_nao_aplicavel) : "")
-      + '</div><div class="actions"><button class="btn-reset" data-action="undo" data-id="' + lead.id + '">Desfazer / voltar para pendente</button></div>';
+      + envioHtml
+      + '</div><div class="actions">'
+      + (lead.status_aprovacao === "aprovado" && lead.status_envio !== "enviado"
+          ? '<button class="btn-enviado" data-action="marcar-enviado" data-id="' + lead.id + '">Marcar como enviado</button>'
+          : "")
+      + (lead.status_aprovacao === "aprovado" && lead.status_envio === "enviado"
+          ? '<button class="btn-desfazer-envio" data-action="desfazer-envio" data-id="' + lead.id + '">Desfazer envio</button>'
+          : "")
+      + '<button class="btn-reset" data-action="undo" data-id="' + lead.id + '">Desfazer / voltar para pendente</button>'
+      + '</div>';
   }
 
   var out = '<div class="card" id="card-' + lead.id + '">'
@@ -393,6 +414,10 @@ document.getElementById("list").addEventListener("click", function (e) {
     decide(id, "nao_aplicavel");
   } else if (action === "undo") {
     resetDecision(id);
+  } else if (action === "marcar-enviado") {
+    marcarEnviado(id);
+  } else if (action === "desfazer-envio") {
+    desfazerEnvio(id);
   }
 });
 
@@ -456,6 +481,28 @@ async function decide(id, decision) {
 async function resetDecision(id) {
   if (!confirm("Voltar este lead para pendente?")) return;
   var res = await fetch(ROUTE_BASE + "/api/leads/" + id + "/reset", { method: "POST" });
+  var data = await res.json();
+  if (data.error) {
+    alert("Erro: " + data.error);
+    return;
+  }
+  loadLeads();
+}
+
+async function marcarEnviado(id) {
+  if (!confirm("Confirmar que a mensagem foi enviada para este lead agora?")) return;
+  var res = await fetch(ROUTE_BASE + "/api/leads/" + id + "/marcar-enviado", { method: "POST" });
+  var data = await res.json();
+  if (data.error) {
+    alert("Erro: " + data.error);
+    return;
+  }
+  loadLeads();
+}
+
+async function desfazerEnvio(id) {
+  if (!confirm("Desfazer o registro de envio deste lead?")) return;
+  var res = await fetch(ROUTE_BASE + "/api/leads/" + id + "/desfazer-envio", { method: "POST" });
   var data = await res.json();
   if (data.error) {
     alert("Erro: " + data.error);
