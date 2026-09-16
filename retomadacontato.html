@@ -103,6 +103,7 @@
   .badge-aprovado { background: var(--green-bg); color: var(--green); }
   .badge-rejeitado { background: var(--red-bg); color: var(--red); }
   .badge-nao_aplicavel { background: #eeeeee; color: #555; }
+  .badge-retomada-crm { background: #e6f0fb; color: #2a5f9e; border: 1px solid #b9d3ef; }
 
   .card-body { padding: 0 16px 16px; display: none; border-top: 1px solid var(--border); }
   .card.open .card-body { display: block; padding-top: 14px; }
@@ -234,6 +235,16 @@
         <option value="Alessandra Conceição">Alessandra Conceição</option>
         <option value="Guilherme Andrade">Guilherme Andrade</option>
         <option value="Polyanna Bruno">Polyanna Bruno</option>
+        <option value="Sarina Panza">Sarina Panza</option>
+        <option value="Talita Vieira">Talita Vieira</option>
+      </select>
+    </div>
+    <div class="priority-filter">
+      Retomada no CRM:
+      <select id="retomadaCrmFilter">
+        <option value="todos">Todos</option>
+        <option value="sim">Sinalizado (Nutrição/retomada)</option>
+        <option value="nao">Não sinalizado</option>
       </select>
     </div>
     <div class="priority-filter">
@@ -347,6 +358,13 @@ envioFilter.addEventListener("change", function () {
   render();
 });
 
+var currentRetomadaCrm = "todos";
+var retomadaCrmFilter = document.getElementById("retomadaCrmFilter");
+retomadaCrmFilter.addEventListener("change", function () {
+  currentRetomadaCrm = retomadaCrmFilter.value;
+  render();
+});
+
 var sentFrom = document.getElementById("sentFrom");
 var sentTo = document.getElementById("sentTo");
 sentFrom.addEventListener("change", render);
@@ -432,6 +450,8 @@ function render() {
     }
     if (currentEnvio === "aguardando" && l.status_envio === "enviado") return false;
     if (currentEnvio === "enviado" && l.status_envio !== "enviado") return false;
+    if (currentRetomadaCrm === "sim" && !l.no_funil_retomada_crm) return false;
+    if (currentRetomadaCrm === "nao" && l.no_funil_retomada_crm) return false;
     if (sentFrom.value || sentTo.value) {
       if (!l.enviado_em) return false;
       var sentDate = l.enviado_em.slice(0, 10);
@@ -498,7 +518,7 @@ function leadCardHtml(lead) {
     + '<div class="card-head" data-action="toggle" data-id="' + lead.id + '">'
     + '<div><div class="lead-name">' + escapeHtml(lead.nome_lead || lead.email) + '</div>'
     + '<div class="lead-meta">' + escapeHtml(lead.email) + ' · closer: ' + escapeHtml(lead.closer_sdr_original || "-") + ' · ' + escapeHtml(lead.meses_desde_reuniao || "") + ' meses desde a reunião</div></div>'
-    + '<div style="display:flex;align-items:center;gap:8px;">' + badgeForScore(lead.score_potencial) + badgeForStatus(lead.status_aprovacao) + '<span class="chevron">▶</span></div>'
+    + '<div style="display:flex;align-items:center;gap:8px;">' + badgeForScore(lead.score_potencial) + (lead.no_funil_retomada_crm ? '<span class="badge badge-retomada-crm" title="Closer já sinalizou este lead no funil retomada do CRM">🔁 Retomada CRM</span>' : "") + badgeForStatus(lead.status_aprovacao) + '<span class="chevron">▶</span></div>'
     + '</div>'
     + '<div class="card-body">'
     + '<div class="section-title">Resumo</div>'
@@ -516,6 +536,7 @@ function leadCardHtml(lead) {
     + '<div><span>Remuneração mensal: </span>' + escapeHtml(lead.remuneracao_mensal || "-") + '</div>'
     + (lead.linkedin_url ? '<div><span>LinkedIn: </span><a href="' + escapeHtml(lead.linkedin_url) + '" target="_blank" rel="noopener">abrir perfil ↗</a></div>' : "")
     + (lead.deal_id_crm ? '<div><span>CRM: </span><a href="https://app.pipe.run/pipeline/gerenciador/visualizar/' + lead.deal_id_crm + '" target="_blank" rel="noopener">abrir oportunidade ↗</a></div>' : "")
+    + (lead.no_funil_retomada_crm ? '<div><span>Retomada no CRM: </span>sim — etapa "' + escapeHtml(lead.retomada_crm_etapa || "-") + '"' + (lead.retomada_crm_deal_id ? ' (<a href="https://app.pipe.run/pipeline/gerenciador/visualizar/' + lead.retomada_crm_deal_id + '" target="_blank" rel="noopener">abrir ↗</a>)' : '') + '</div>' : '')
     + '</div>'
     + (lead.justificativa_score ? '<div class="section-title">Justificativa do score</div><div class="text-block">' + escapeHtml(lead.justificativa_score) + '</div>' : "")
     + (lead.resumo_se ? '<div class="section-title">Resumo — Sessão Estratégica</div><div class="text-block">' + escapeHtml(lead.resumo_se) + '</div>' : "")
